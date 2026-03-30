@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Gastos 💸</title>
+
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+    margin: 0;
+    background: #121212;
+    color: #fff;
+}
+
+.container {
+    max-width: 700px;
+    margin: auto;
+    padding: 15px;
+}
+
+h2 {
+    text-align: center;
+}
+
+.card {
+    background: #1e1e1e;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 15px;
+}
+
+h3 {
+    color: #00c853;
+}
+
+input, select {
+    width: 100%;
+    padding: 12px;
+    margin: 6px 0;
+    border-radius: 10px;
+    border: none;
+    background: #2c2c2c;
+    color: white;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+    border-radius: 10px;
+    border: none;
+    background: #00c853;
+    color: white;
+    font-weight: bold;
+}
+
+button.delete {
+    background: #d32f2f;
+}
+
+.lista-item {
+    background: #2c2c2c;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 10px;
+}
+
+.lista-item.selected {
+    border: 2px solid #00c853;
+}
+
+.grid {
+    display: flex;
+    gap: 10px;
+}
+
+.grid > div {
+    flex: 1;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>💸 Control de Gastos</h2>
+
+<div class="card">
+<h3>📅 Mes</h3>
+<input type="month" id="mes" onchange="cambiarMes()">
+</div>
+
+<div class="card">
+<h3>💼 Trabajo</h3>
+<input id="valorHora" placeholder="Valor por hora">
+<input id="horas" placeholder="Horas trabajadas">
+<button onclick="guardarConfig()">Guardar</button>
+</div>
+
+<div class="card">
+<h3>🧾 Agregar Gasto</h3>
+<input id="desc" placeholder="Descripción">
+<input id="monto" type="number" placeholder="Monto">
+
+<select id="tipo">
+<option value="Personal">Yo (Personal)</option>
+<option value="Trabajo">Ro (Trabajo)</option>
+</select>
+
+<button onclick="agregar()">Agregar / Guardar</button>
+<button class="delete" onclick="eliminar()">Eliminar seleccionado</button>
+</div>
+
+<div class="grid">
+<div class="card">
+<h3>👤 Yo</h3>
+<div id="listaPersonal"></div>
+</div>
+
+<div class="card">
+<h3>🧾 Ro</h3>
+<div id="listaTrabajo"></div>
+</div>
+</div>
+
+<div class="card">
+<h3>📊 Resumen</h3>
+<button onclick="mostrarResumen()">Ver resumen</button>
+<p id="resumen"></p>
+</div>
+
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem("dataMeses")) || {};
+let mesActual = new Date().toISOString().slice(0,7);
+let seleccionado = null;
+
+document.getElementById("mes").value = mesActual;
+
+function obtenerMes() {
+    if (!data[mesActual]) {
+        data[mesActual] = {
+            valorHora: 0,
+            horas: 0,
+            gastos: []
+        };
+    }
+    return data[mesActual];
+}
+
+function guardar() {
+    localStorage.setItem("dataMeses", JSON.stringify(data));
+}
+
+function cambiarMes() {
+    mesActual = document.getElementById("mes").value;
+    seleccionado = null;
+    render();
+}
+
+function render() {
+    let mes = obtenerMes();
+
+    listaPersonal.innerHTML = "";
+    listaTrabajo.innerHTML = "";
+
+    mes.gastos.forEach((g, i) => {
+        let div = document.createElement("div");
+        div.className = "lista-item";
+
+        if (i === seleccionado)
+            div.classList.add("selected");
+
+        div.innerHTML = `${g.desc} - $${g.monto}`;
+
+        div.onclick = () => {
+            seleccionado = i;
+            desc.value = g.desc;
+            monto.value = g.monto;
+            tipo.value = g.tipo;
+            render();
+        };
+
+        if (g.tipo === "Personal")
+            listaPersonal.appendChild(div);
+        else
+            listaTrabajo.appendChild(div);
+    });
+
+    valorHora.value = mes.valorHora;
+    horas.value = mes.horas;
+}
+
+function agregar() {
+    let mes = obtenerMes();
+
+    let nuevo = {
+        desc: desc.value,
+        monto: parseInt(monto.value),
+        tipo: tipo.value
+    };
+
+    if (!nuevo.desc || !nuevo.monto) return alert("Completar");
+
+    if (seleccionado === null)
+        mes.gastos.push(nuevo);
+    else {
+        mes.gastos[seleccionado] = nuevo;
+        seleccionado = null;
+    }
+
+    guardar();
+    render();
+
+    desc.value = "";
+    monto.value = "";
+}
+
+function eliminar() {
+    let mes = obtenerMes();
+
+    if (seleccionado === null) return;
+
+    mes.gastos.splice(seleccionado, 1);
+    seleccionado = null;
+
+    guardar();
+    render();
+}
+
+function guardarConfig() {
+    let mes = obtenerMes();
+
+    mes.valorHora = parseInt(valorHora.value) || 0;
+    mes.horas = parseInt(horas.value) || 0;
+
+    guardar();
+    render();
+}
+
+function mostrarResumen() {
+    let mes = obtenerMes();
+
+    let yo = mes.gastos.filter(g=>g.tipo==="Personal")
+        .reduce((a,b)=>a+b.monto,0);
+
+    let ro = mes.gastos.filter(g=>g.tipo==="Trabajo")
+        .reduce((a,b)=>a+b.monto,0);
+
+    let bruto = mes.horas * mes.valorHora;
+    let limpio = bruto - ro;
+    let final = limpio - yo;
+
+    resumen.innerText = `
+Mes: ${mesActual}
+
+💰 Bruto: $${bruto}
+🧾 Ro: $${ro}
+👉 Limpio: $${limpio}
+
+👤 Yo: $${yo}
+
+🏁 Final: $${final}
+`;
+}
+
+render();
+</script>
+
+</body>
+</html>
